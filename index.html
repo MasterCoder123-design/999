@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>2P Pixel Drift Racers</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    canvas {
+      background: #222;
+      display: block;
+      margin: auto;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game" width="640" height="480"></canvas>
+<script>
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+
+  const scale = 3;
+  const carSize = 6;
+
+  const keys = {};
+  document.addEventListener("keydown", e => keys[e.key] = true);
+  document.addEventListener("keyup", e => keys[e.key] = false);
+
+  function createCar(color, x, y, controls) {
+    return {
+      x, y,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      color,
+      controls,
+      update() {
+        const speed = 1.5;
+        const friction = 0.95;
+
+        if (keys[this.controls.up]) {
+          this.vx += Math.cos(this.angle) * speed;
+          this.vy += Math.sin(this.angle) * speed;
+        }
+        if (keys[this.controls.down]) {
+          this.vx *= 0.95;
+          this.vy *= 0.95;
+        }
+        if (keys[this.controls.left]) {
+          this.angle -= 0.07;
+        }
+        if (keys[this.controls.right]) {
+          this.angle += 0.07;
+        }
+
+        this.vx *= friction;
+        this.vy *= friction;
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Keep inside bounds
+        this.x = Math.max(0, Math.min(canvas.width, this.x));
+        this.y = Math.max(0, Math.min(canvas.height, this.y));
+      },
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-carSize, -carSize / 2, carSize * 2, carSize);
+        ctx.restore();
+      }
+    }
+  }
+
+  const redCar = createCar("red", 100, 240, {
+    up: "w",
+    down: "s",
+    left: "a",
+    right: "d"
+  });
+
+  const blueCar = createCar("blue", 540, 240, {
+    up: "ArrowUp",
+    down: "ArrowDown",
+    left: "ArrowLeft",
+    right: "ArrowRight"
+  });
+
+  function drawTrack() {
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function loop() {
+    drawTrack();
+
+    redCar.update();
+    blueCar.update();
+
+    redCar.draw();
+    blueCar.draw();
+
+    requestAnimationFrame(loop);
+  }
+
+  loop();
+</script>
+</body>
+</html>

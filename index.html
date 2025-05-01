@@ -2,110 +2,158 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>2P Pixel Drift Racers</title>
+  <title>Pixel Victory Road</title>
   <style>
-    * { margin: 0; padding: 0; }
+    html, body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+    }
     canvas {
-      background: #222;
       display: block;
-      margin: auto;
       image-rendering: pixelated;
     }
   </style>
 </head>
 <body>
-<canvas id="game" width="640" height="480"></canvas>
+<canvas id="game"></canvas>
 <script>
-  const canvas = document.getElementById("game");
-  const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
 
-  const scale = 3;
-  const carSize = 6;
+let width = window.innerWidth;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
 
-  const keys = {};
-  document.addEventListener("keydown", e => keys[e.key] = true);
-  document.addEventListener("keyup", e => keys[e.key] = false);
+window.addEventListener('resize', () => {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+});
 
-  function createCar(color, x, y, controls) {
-    return {
-      x, y,
-      vx: 0,
-      vy: 0,
-      angle: 0,
-      color,
-      controls,
-      update() {
-        const speed = 1.5;
-        const friction = 0.95;
+const keys = {};
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
 
-        if (keys[this.controls.up]) {
-          this.vx += Math.cos(this.angle) * speed;
-          this.vy += Math.sin(this.angle) * speed;
-        }
-        if (keys[this.controls.down]) {
-          this.vx *= 0.95;
-          this.vy *= 0.95;
-        }
-        if (keys[this.controls.left]) {
-          this.angle -= 0.07;
-        }
-        if (keys[this.controls.right]) {
-          this.angle += 0.07;
-        }
+const tileSize = 40;
+const cols = Math.floor(width / tileSize);
+const rows = Math.floor(height / tileSize);
 
-        this.vx *= friction;
-        this.vy *= friction;
+let scrollY = 0;
+let finished = false;
+let winner = "";
 
-        this.x += this.vx;
-        this.y += this.vy;
+function makeTrackRow() {
+  const row = new Array(cols).fill(1);
+  for (let i = 0; i < Math.floor(Math.random() * 3); i++) {
+    row[Math.floor(Math.random() * cols)] = 0; // hole
+  }
+  return row;
+}
 
-        // Keep inside bounds
-        this.x = Math.max(0, Math.min(canvas.width, this.x));
-        this.y = Math.max(0, Math.min(canvas.height, this.y));
-      },
-      draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-carSize, -carSize / 2, carSize * 2, carSize);
-        ctx.restore();
+let track = [];
+for (let i = 0; i < rows + 10; i++) {
+  track.push(makeTrackRow());
+}
+
+function createCar(color, x) {
+  return {
+    x: x * tileSize + tileSize / 4,
+    y: height - tileSize * 2,
+    vx: 0,
+    vy: 0,
+    color,
+    w: tileSize / 2,
+    h: tileSize / 2,
+    update(up, down, left, right) {
+      const speed = 4;
+      if (keys[up]) this.vy = -speed;
+      if (keys[down]) this.vy = speed;
+      if (keys[left]) this.vx = -speed;
+      if (keys[right]) this.vx = speed;
+
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // keep inside screen
+      this.x = Math.max(0, Math.min(width - this.w, this.x));
+      this.y = Math.max(0, Math.min(height - this.h, this.y));
+
+      this.vx *= 0.8;
+      this.vy *= 0.8;
+
+      // win check
+      if (this.y <= tileSize && !finished) {
+        finished = true;
+        winner = this.color.toUpperCase() + " WINS!";
+      }
+    },
+    draw() {
+      ctx.fillStyle = this.color;
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
+  }
+}
+
+const redCar = createCar("red", 5);
+const blueCar = createCar("blue", cols - 6);
+
+function drawTrack() {
+  scrollY += 2;
+
+  if (scrollY >= tileSize) {
+    scrollY = 0;
+    track.shift();
+    track.push(makeTrackRow());
+  }
+
+  for (let y = 0; y < rows + 1; y++) {
+    for (let x = 0; x < cols; x++) {
+      if (track[y][x] === 1) {
+        ctx.fillStyle = "#444";
+        ctx.fillRect(x * tileSize, y * tileSize - scrollY, tileSize, tileSize);
       }
     }
   }
+}
 
-  const redCar = createCar("red", 100, 240, {
-    up: "w",
-    down: "s",
-    left: "a",
-    right: "d"
-  });
+function checkFalling(car) {
+  const col = Math.floor(car.x / tileSize);
+  const row = Math.floor((car.y + scrollY) / tileSize);
+  if (track[row] && track[row][col] === 0) {
+    finished = true;
+    winner = (car.color === "red" ? "BLUE" : "RED") + " WINS (Opponent Fell)!";
+  }
+}
 
-  const blueCar = createCar("blue", 540, 240, {
-    up: "ArrowUp",
-    down: "ArrowDown",
-    left: "ArrowLeft",
-    right: "ArrowRight"
-  });
+function loop() {
+  ctx.clearRect(0, 0, width, height);
+  drawTrack();
 
-  function drawTrack() {
-    ctx.fillStyle = "#111";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!finished) {
+    redCar.update("w", "s", "a", "d");
+    blueCar.update("ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight");
+
+    checkFalling(redCar);
+    checkFalling(blueCar);
   }
 
-  function loop() {
-    drawTrack();
+  redCar.draw();
+  blueCar.draw();
 
-    redCar.update();
-    blueCar.update();
-
-    redCar.draw();
-    blueCar.draw();
-
-    requestAnimationFrame(loop);
+  if (finished) {
+    ctx.fillStyle = "white";
+    ctx.font = "48px monospace";
+    ctx.fillText(winner, width / 2 - 200, height / 2);
+    ctx.font = "24px monospace";
+    ctx.fillText("Reload the page to play again", width / 2 - 150, height / 2 + 40);
   }
 
-  loop();
+  requestAnimationFrame(loop);
+}
+loop();
 </script>
 </body>
 </html>
